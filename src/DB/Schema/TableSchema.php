@@ -22,6 +22,8 @@ use DBDiff\SQLGen\Schema\SQL;
 
 use DBDiff\Logger;
 
+use Illuminate\Support\Str;
+
 
 class TableSchema {
 
@@ -34,24 +36,26 @@ class TableSchema {
     public function getSchema($connection, $table) {
         // collation & engine
         $status = $this->{$connection}->select("show table status like '$table'");
-        $engine = $status[0]['Engine'];
-        $collation = $status[0]['Collation'];
-        
-        $schema = $this->{$connection}->select("SHOW CREATE TABLE `$table`")[0]['Create Table'];
+        $status = (array) $status[0];
+        $engine = $status['Engine'];
+        $collation = $status['Collation'];
+
+        $schema = $this->{$connection}->select("SHOW CREATE TABLE `$table`");
+        $schema = ((array) $schema[0])['Create Table'];
         $lines = array_map(function($el) { return trim($el);}, explode("\n", $schema));
         $lines = array_slice($lines, 1, -1);
-        
+
         $columns = [];
         $keys = [];
         $constraints = [];
-        
+
         foreach ($lines as $line) {
             preg_match("/`([^`]+)`/", $line, $matches);
             $name = $matches[1];
             $line = trim($line, ',');
-            if (starts_with($line, '`')) { // column
+            if (Str::startsWith($line, '`')) { // column
                 $columns[$name] = $line;
-            } else if (starts_with($line, 'CONSTRAINT')) { // constraint
+            } else if (Str::startsWith($line, 'CONSTRAINT')) { // constraint
                 $constraints[$name] = $line;
             } else { // keys
                 $keys[$name] = $line;
@@ -69,7 +73,7 @@ class TableSchema {
 
     public function getDiff($table) {
         Logger::info("Now calculating schema diff for table `$table`");
-        
+
         $diffSequence = [];
         $sourceSchema = $this->getSchema('source', $table);
         $targetSchema = $this->getSchema('target', $table);

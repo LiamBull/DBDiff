@@ -1,23 +1,23 @@
 <?php namespace DBDiff\DB\Schema;
 
-use Diff\Differ\ListDiffer;
-
-use DBDiff\Params\ParamsFactory;
-use DBDiff\Diff\SetDBCollation;
-use DBDiff\Diff\SetDBCharset;
-use DBDiff\Diff\DropTable;
 use DBDiff\Diff\AddTable;
 use DBDiff\Diff\AlterTable;
+use DBDiff\Diff\DropTable;
+use DBDiff\Diff\SetDBCharset;
+use DBDiff\Diff\SetDBCollation;
+use DBDiff\Params\ParamsFactory;
 
 
+class DBSchema
+{
 
-class DBSchema {
-
-    function __construct($manager) {
+    function __construct($manager)
+    {
         $this->manager = $manager;
     }
-    
-    function getDiff() {
+
+    function getDiff()
+    {
         $params = ParamsFactory::get();
 
         $diffs = [];
@@ -36,7 +36,7 @@ class DBSchema {
         if ($sourceCharset !== $targetCharset) {
             $diffs[] = new SetDBCharset($dbName, $sourceCharset, $targetCharset);
         }
-        
+
         // Tables
         $tableSchema = new TableSchema($this->manager);
 
@@ -47,6 +47,12 @@ class DBSchema {
             $sourceTables = array_diff($sourceTables, $params->tablesToIgnore);
             $targetTables = array_diff($targetTables, $params->tablesToIgnore);
         }
+
+        $sourceKey = array_key_first((array)$sourceTables[0]);
+        $targetKey = array_key_first((array)$targetTables[0]);
+
+        $sourceTables = collect($sourceTables)->transform(fn($table) => $table->{$sourceKey})->toArray();
+        $targetTables = collect($targetTables)->transform(fn($table) => $table->{$targetKey})->toArray();
 
         $addedTables = array_diff($sourceTables, $targetTables);
         foreach ($addedTables as $table) {
@@ -67,9 +73,11 @@ class DBSchema {
         return $diffs;
     }
 
-    protected function getDBVariable($connection, $var) {
+    protected function getDBVariable($connection, $var)
+    {
         $result = $this->manager->getDB($connection)->select("show variables like '$var'");
-        return $result[0]['Value'];
+        $result = (array) $result[0];
+        return $result['Value'];
     }
 
 }
